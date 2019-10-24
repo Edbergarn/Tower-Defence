@@ -58,7 +58,7 @@ let map = [ //12 st
     {x: 600, y: 400},
     {x: 900, y: 400}
 ];
-
+let startPos = corners[0];
 let totalWidth = canvas.width;
 let totalHeight = canvas.height;
 let pi = Math.PI;
@@ -73,7 +73,6 @@ let shooting = false;
 let fire;
 let projectiles = [];
 let minions = [];
-let startPos = corners[0];
 
 function clearScreen()//Clearar skärmen
 {
@@ -98,42 +97,50 @@ function rectangle(x, y, width, height, color)
 }
 
 /**
+ * Renders all components in the game
+ */
+function draw(){
+
+    clearScreen();
+    
+    //Clears the screen
+    rectangle(0,0,totalWidth,totalHeight,"grey");
+
+    //Sets linewidth for the road
+    ctx.lineWidth = 30;
+
+    //Draws the map
+    let oldCoord = map[startPos.mapIndex];
+
+    map.forEach(map => {
+        ctx.beginPath();
+        ctx.moveTo(oldCoord.x, oldCoord.y);
+        ctx.lineTo(map.x, map.y);
+
+        ctx.strokeStyle = '#875D2D';
+        ctx.stroke();
+        circle(map.x, map.y, 15, '#875D2D');
+
+        oldCoord = {x: map.x, y: map.y};    
+    });
+
+    //Draws Turrets
+    turrets.forEach(map => {
+        rectangle(map.posX, map.posY, 40, 40, 'red');
+    });
+
+    minions.forEach(minion => {
+        ctx.drawImage(playerImg, minion.posX-16, minion.posY-16);
+    });
+    
+    window.requestAnimationFrame(draw);
+}
+
+/**
  * Runs 60 times per second
  * Kinda like a main()
  */
 function update(){
-    let oldCoord = map[startPos.mapIndex];
-
-    //Clears the screen
-    clearScreen();
-
-    //Sets linewidth for the road
-    ctx.lineWidth = 30;
-    
-    //Draws the map
-    rectangle(0,0,totalWidth,totalHeight,"grey");
-    map.forEach(element => {
-        ctx.beginPath();
-        ctx.moveTo(oldCoord.x, oldCoord.y);
-        ctx.lineTo(element.x, element.y);
-
-        ctx.strokeStyle = '#875D2D';
-        ctx.stroke();
-        circle(element.x, element.y, 15, '#875D2D');
-
-        oldCoord = {x: element.x, y: element.y};    
-    });
-
-    //Draws Turrets
-    turrets.forEach(element => {
-        rectangle(element.posX, element.posY, 40, 40, 'red');
-    })
-
-    if(turrets-length == 0){
-        spawnTurret(675, 705, 5, 30, 100);
-        spawnTurret(265, 305, 5, 30, 100);
-
-    }
     //If no minions, create new minionwave
     if(minions.length == 0){
 
@@ -145,6 +152,12 @@ function update(){
         activeMinions = 0
     }
 
+    if(turrets-length == 0){
+        spawnTurret(675, 705, 5, 80, 100);
+        spawnTurret(265, 305, 5, 80, 100);
+
+    }
+
     //Calls Movefunc for each minion
     for(let i = 0; i < minions.length; i++){
         let minion = minionsMove(minions[i], i);
@@ -152,6 +165,21 @@ function update(){
         if(minion.goal == 12 && minion.from == 11){
             index = minions.indexOf(minion)
             splice(minion);
+        }
+    }
+        
+    for(let i = 0; i < projectiles.length; i++){
+        let currentProjectile = projectiles[i].goalId;
+        for(let i= 0; i < minions.length; i++){
+            if(currentProjectile == minions[i].id){
+                var minion = minions[i];
+            }
+        }
+        if(minion){
+            projectiles[i].goalX = minion.posX;
+            projectiles[i].goalY = minion.posY; 
+        }else{
+            projectiles.splice(projectiles.indexOf(projectiles[i]));
         }
     }
 }
@@ -170,7 +198,7 @@ function spawnTurret(x, y, dmg, rof, range){
         posX: x,
         posY: y,
         dmg: dmg,
-        rof: rof,
+        rof: 60000/rof,
         range: range,
         shooting: shooting
     }
@@ -223,7 +251,6 @@ function minionsMove(minion, i){
         changeDir(minion);
         
     }
-    ctx.drawImage(playerImg, minion.posX-16, minion.posY-16);
     return minion;
 }
 
@@ -245,19 +272,37 @@ function splice(minion){
 function shoot(turret, minion){
     distance = getDistance(turret, minion);
     if(distance < turret.range){
-        console.log("shooting");
-        let projectile = {
-            posX: turret.posX,
-            posY: turret.posY,
-            goalX: minion.posX,
-            goalY: minion.posY,
-            speed: 5
-        }
-        projectiles.push(projectile);
+        console.log(turret.id, "shooting");
+        spawnProjectile(turret, minion);
+        candy();
     }
+    setTimeout(stopFire, turret.rof, turret);
+}
 
-    setTimeout(turret.shooting = false, 500);
-    setTimeout(clearInterval(fire), 500);
+function candy(){
+    projectiles.forEach(projectile => {
+        dx = projectile.goalX - projectile.posX;
+        dy = projectile.goalY - projectile.posY;
+        angle = Math.atan2(dy, dx);
+        console.log(angle);
+    });
+}
+
+function spawnProjectile(turret, minion){
+    let projectile = {
+        posX: turret.posX,
+        posY: turret.posY,
+        goalId: minion.id,
+        goalX: minion.posX,
+        goalY: minion.posY,
+        speed: 5
+    }
+    projectiles.push(projectile);
+}
+
+function stopFire(turret){
+    clearInterval(fire);
+    turret.shooting = false;
 }
 
 function getDistance(turret, minion){
@@ -271,14 +316,12 @@ function distanceFromTurret(minion){
     turrets.forEach(turret => {
         distance = getDistance(turret, minion);
         if(distance < turret.range){
-            if(!turret.shooting){
-                console.log(turret.shooting);   
-                turret.shooting = true;
-                console.log(turret.shooting);   
-                fire = setInterval(shoot(turret, minion), 500);
-                console.log(turret.shooting);   
+            if(!turret.shooting){   
+                turret.shooting = true;            
+                fire = setInterval(shoot(turret, minion), turret.rof);
             }
         }
 
     });
 }
+window.requestAnimationFrame(draw);
