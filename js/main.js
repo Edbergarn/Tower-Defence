@@ -18,10 +18,15 @@ const left = 0;
 const right = 1;
 const up = 2;
 const down = 3;
+let bgImage = new Image();
+let playerImage = new Image();
+let pumpkinImage = new Image();
 
-let playerImg = new Image();
 //Made by matras!!
-playerImg.src = 'img/BlueGhost.png';
+playerImage.src = 'img/BlueGhost.png';
+bgImage.src = 'img/bg.png';
+pumpkinImage.src = 'img/pumpkin.png';
+
 
 
 //When arriving to corner(mapCoords), change direction
@@ -56,16 +61,27 @@ let map = [ //12 st
     {x: 50, y: 50},
     {x: 600, y: 50},
     {x: 600, y: 400},
-    {x: 900, y: 400}
+    {x: 1123, y: 400}
 ];
 let startPos = corners[0];
 let totalWidth = canvas.width;
 let totalHeight = canvas.height;
-let pi = Math.PI;
+let hp = 100;
 let FPS = 120;
 let theAnimation = setInterval(update, 1000/FPS);//Mitt Drawgrej
 let spawnMinions;
-var activeMinions = 0;
+let activeMinions = 0;
+let waveAmount = 8;
+let wave = 0;
+
+//Cash and buying turrets
+let cash = 100;
+let turret1 = {
+    dmg: 10,
+    range: 100,
+    rof: 80,
+    cost: 100
+}
 
 let turrets = [];
 let turretId = 1;
@@ -80,7 +96,7 @@ function clearScreen()//Clearar skärmen
 }
 
 //Makes circle
-function circle(x, y, r, color) 
+function circle(x, y, r, color)
 {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -101,10 +117,10 @@ function rectangle(x, y, width, height, color)
  */
 function draw(){
 
+    //Clears the screen
     clearScreen();
     
-    //Clears the screen
-    rectangle(0,0,totalWidth,totalHeight,"grey");
+    ctx.drawImage(bgImage, 0, 0);
 
     //Sets linewidth for the road
     ctx.lineWidth = 30;
@@ -121,17 +137,41 @@ function draw(){
         ctx.stroke();
         circle(map.x, map.y, 15, '#875D2D');
 
-        oldCoord = {x: map.x, y: map.y};    
+        oldCoord = {x: map.x, y: map.y};
     });
 
     //Draws Turrets
-    turrets.forEach(map => {
-        rectangle(map.posX, map.posY, 40, 40, 'red');
+    turrets.forEach(turret => {
+        rectangle(turret.posX - turret.width / 2, turret.posY - turret.height / 2, 40, 40, 'red');
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "green";
+
+        ctx.beginPath();
+        ctx.arc(turret.posX, turret.posY, turret.range, 0, 2 * Math.PI);
+        ctx.stroke();
     });
 
+    // Draws minions
     minions.forEach(minion => {
-        ctx.drawImage(playerImg, minion.posX-16, minion.posY-16);
+        ctx.drawImage(playerImage, minion.posX-16, minion.posY-16);
     });
+
+    // Draws projectiles
+    projectiles.forEach(projectile => {
+    ctx.drawImage(pumpkinImage, projectile.posX-9, projectile.posY-9);
+    });
+
+    ctx.fillStyle = "white";
+    ctx.font = "40px Arial";
+    ctx.fillText("Hp: " + hp, 920, 470);
+    ctx.fillText("Cash: " + cash, 920, 520);
+    ctx.fillText("Wave: " + wave, 10, 850);
+    
+    // BuyMenu
+    if(cash >= 100){
+        
+    }
+
     
     window.requestAnimationFrame(draw);
 }
@@ -143,18 +183,22 @@ function draw(){
 function update(){
     //If no minions, create new minionwave
     if(minions.length == 0){
-
-        spawnWave();
-        spawnMinions = setInterval(spawnWave, 500);
+        wave++;
+        spawnMinion();
+        spawnMinions = setInterval(spawnMinion, 500);
     }
-    if(activeMinions >= 10){
+    if(activeMinions >= waveAmount){
         clearInterval(spawnMinions);
         activeMinions = 0
+        waveAmount++;
+
     }
 
     if(turrets-length == 0){
-        spawnTurret(675, 705, 5, 80, 100);
-        spawnTurret(265, 305, 5, 80, 100);
+        spawnTurret(700, 705, 10, 80, 100);
+        spawnTurret(300, 305, 10, 80, 100);
+        spawnTurret(550, 100, 10, 80, 100);
+
 
     }
 
@@ -165,21 +209,24 @@ function update(){
         if(minion.goal == 12 && minion.from == 11){
             index = minions.indexOf(minion)
             splice(minion);
+            hp -= 10;
         }
     }
         
     for(let i = 0; i < projectiles.length; i++){
         let currentProjectile = projectiles[i].goalId;
-        for(let i= 0; i < minions.length; i++){
-            if(currentProjectile == minions[i].id){
-                var minion = minions[i];
-            }
-        }
+        let minion = findCurrentTarget(currentProjectile);
+
         if(minion){
-            projectiles[i].goalX = minion.posX;
-            projectiles[i].goalY = minion.posY; 
+            let inRange = getDistanceToMinion(projectiles[i], minion, 15);
+            if (inRange){
+                targetHit(projectiles[i], minion);
+            }else{
+                projectilesMove(projectiles[i], minion);
+    
+            }
         }else{
-            projectiles.splice(projectiles.indexOf(projectiles[i]));
+            projectiles.splice(projectiles.indexOf(projectiles[i]), 1);
         }
     }
 }
@@ -195,8 +242,10 @@ function update(){
 function spawnTurret(x, y, dmg, rof, range){
     let turret = {
         id: turretId,
-        posX: x,
-        posY: y,
+        width: 40,
+        height: 40,
+        posX: x - 20,
+        posY: y + 20,
         dmg: dmg,
         rof: 60000/rof,
         range: range,
@@ -209,12 +258,13 @@ function spawnTurret(x, y, dmg, rof, range){
 /**
  * Spawns a minion and pushes it into a array of minions
  */
-function spawnWave(){ // Starts a minionwave
+function spawnMinion(){ // Starts a minionwave
         let minion = {
             id: activeMinions += 1,
             posX: map[startPos.mapIndex].x,
             posY: map[startPos.mapIndex].y,
             dir: startPos.dir,
+            speed: 2,
             from: 0,
             goal: 1,
             hp: 20
@@ -228,26 +278,28 @@ function spawnWave(){ // Starts a minionwave
  * @param {Object} minion 
  */
 function minionsMove(minion, i){
-    distanceFromTurret(minion);
+    inTurretRange(minion);
     switch(minion.dir){
         case left:
-            minion.posX -= 2;
+            minion.posX -= minion.speed;
             break;
         case right:
-            minion.posX += 2;
+            minion.posX += minion.speed;
             break;
         case up:
-            minion.posY -= 2;
+            minion.posY -= minion.speed;
             break;
         case down: 
-            minion.posY += 2;
+            minion.posY += minion.speed;
             break;
         default:
             minion.posX = minion.posX;
             minion.posY = minion.posY;
             break;    
     }
-    if(minion.posX == map[minion.goal].x && minion.posY == map[minion.goal].y){
+    if (map[minion.goal].x - 2 <= minion.posX && minion.posX <= map[minion.goal].x + 2 
+        && map[minion.goal].y - 2 <= minion.posY && minion.posY <= map[minion.goal].y + 2
+        ){
         changeDir(minion);
         
     }
@@ -255,9 +307,13 @@ function minionsMove(minion, i){
 }
 
 function changeDir(minion){
+    minion.posX = map[minion.goal].x;
+    minion.posY = map[minion.goal].y;
     minion.goal++;
     minion.from++;
     minion.dir = corners[minion.from].dir;
+    
+
 }
 
 function splice(minion){
@@ -269,23 +325,30 @@ function splice(minion){
     }
 }
 
+function inTurretRange(minion){
+    turrets.forEach(turret => {
+        let inRange = getDistanceToMinion(turret, minion, turret.range);
+        if(inRange){
+            if(!turret.shooting){   
+                turret.shooting = true;
+                fire = setInterval(shoot(turret, minion), turret.rof);
+            }
+        }
+
+    });
+}
+
 function shoot(turret, minion){
-    distance = getDistance(turret, minion);
-    if(distance < turret.range){
-        console.log(turret.id, "shooting");
+    inRange = getDistanceToMinion(turret, minion, turret.range);
+    if(inRange){
         spawnProjectile(turret, minion);
-        candy();
     }
     setTimeout(stopFire, turret.rof, turret);
 }
 
-function candy(){
-    projectiles.forEach(projectile => {
-        dx = projectile.goalX - projectile.posX;
-        dy = projectile.goalY - projectile.posY;
-        angle = Math.atan2(dy, dx);
-        console.log(angle);
-    });
+function stopFire(turret){
+    clearInterval(fire);
+    turret.shooting = false;
 }
 
 function spawnProjectile(turret, minion){
@@ -295,33 +358,61 @@ function spawnProjectile(turret, minion){
         goalId: minion.id,
         goalX: minion.posX,
         goalY: minion.posY,
-        speed: 5
+        dmg: turret.dmg,
+        speed: 3
     }
     projectiles.push(projectile);
 }
 
-function stopFire(turret){
-    clearInterval(fire);
-    turret.shooting = false;
+function projectilesMove(projectile, minion){
+    projectile.goalX = minion.posX;
+    projectile.goalY = minion.posY;
+    angle = getAngle(projectile);
+
+    xVelocity = projectile.speed * Math.cos(angle);
+    yVelocity = projectile.speed * Math.sin(angle);
+    projectile.posX += xVelocity;
+    projectile.posY += yVelocity;
 }
 
-function getDistance(turret, minion){
-    let deltaX = turret.posX - minion.posX;
-    let deltaY = turret.posY - minion.posY;
+function getDistanceToMinion(object, minion, range){
+    let deltaX = object.posX - minion.posX;
+    let deltaY = object.posY - minion.posY;
     let distance = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY));
-    return distance;
+    if(distance <= range){
+        return true;
+    }else{
+        return false;
+    }
 }
 
-function distanceFromTurret(minion){
-    turrets.forEach(turret => {
-        distance = getDistance(turret, minion);
-        if(distance < turret.range){
-            if(!turret.shooting){   
-                turret.shooting = true;            
-                fire = setInterval(shoot(turret, minion), turret.rof);
-            }
+function getAngle(projectile){
+    dx = projectile.goalX - projectile.posX;
+    dy = projectile.goalY - projectile.posY;
+    angle = Math.atan2(dy, dx);
+    return angle;
+}
+
+function findCurrentTarget(currentProjectile){
+    for(let j = 0; j < minions.length; j++){
+        if(currentProjectile == minions[j].id){
+            var minion = minions[j];
         }
-
-    });
+    }
+    return minion;
 }
+
+function targetHit(projectile, minion){
+    minion.hp -= projectile.dmg;         
+    projectiles.splice(projectiles.indexOf(projectile), 1);
+    if(minion.hp <= 0){
+        killMinion(minion)
+    }
+}
+function killMinion(minion){
+    splice(minion);
+    cash += (9 + wave);
+}
+
 window.requestAnimationFrame(draw);
+
