@@ -157,6 +157,7 @@ function circle(x, y, r, color)
   ctx.stroke();
 
 }
+//Makes filled circle
 function circleFill(x, y, r, color)
 {
   ctx.fillStyle = color;
@@ -177,6 +178,7 @@ function rectangle(x, y, width, height, color)
  * Renders all components in the game
  */
 function draw(){
+    //Array of what i can by
     buyables = [];
 
     //Clears the screen
@@ -218,10 +220,13 @@ function draw(){
     projectiles.forEach(projectile => {
     ctx.drawImage(projectile.img, projectile.posX-9, projectile.posY-9);
     });
+
+    //Draws shockwaves
     shockwaves.forEach(shockwave => {
         circle(shockwave.posX, shockwave.posY, shockwave.r, shockwave.color);
     });
 
+    //All text in my game, except endscreen
     ctx.fillStyle = "white";
     ctx.font = "40px Arial";
     ctx.fillText("Hp: " + hp, 920, 470);
@@ -240,10 +245,9 @@ function draw(){
             turret: turret1
         };
         ctx.drawImage(rec.turret.img, rec.x, rec.y);
-
-        // rectangle(400, 820, 40, 40 ,"red");
         buyables.push(rec);
     }
+    
     if(cash >= 500){
         let rec = {
             x: 450,
@@ -254,10 +258,9 @@ function draw(){
             turret: turret2
         };
         ctx.drawImage(rec.turret.img, rec.x, rec.y);
-
-        // rectangle(450, 820, 40, 40 ,"blue");
         buyables.push(rec);
     }
+    
     if(cash >= 2500){
         let rec = {
             x: 500,
@@ -271,20 +274,22 @@ function draw(){
 
         buyables.push(rec);
     }
-    
+
+    //If turret is bought, make it follow the cursor and show range
     if(turretBought){
         ctx.drawImage(turretBought.img, mouse_on_canvas.x - 20, mouse_on_canvas.y - 20);
         ctx.beginPath();
         ctx.arc(mouse_on_canvas.x, mouse_on_canvas.y, turretBought.range, 0, 2 * Math.PI);
         ctx.stroke();
     }
-    window.requestAnimationFrame(draw);
+    //If hp dead, u dead
     if (hp <= 0){
         ctx.fillStyle = "red";
         ctx.font = "200px Arial";
         ctx.fillText("You died", 180, 450);
         clearInterval(theAnimation);
     }
+    window.requestAnimationFrame(draw);
 }
 
 /**
@@ -306,13 +311,14 @@ function update(){
         spawnMinion();
         spawnMinions = setInterval(spawnMinion, 500);
     }
+    //If all minions in the active wave has spawned, stop spawning new ones 
     if(activeMinions >= waveAmount){
         clearInterval(spawnMinions);
-        activeMinions = 0
+        activeMinions = 0;
         waveAmount++;
 
     }
-
+    //Spawns preset turrets
     if(turrets-length == 0){
         spawnTurret(700, 705, turret1);
         spawnTurret(300, 305, turret2);
@@ -452,6 +458,7 @@ function minionsMove(minion, i){
     return minion;
 }
 
+//Changes direction of minion
 function changeDir(minion){
     minion.posX = map[minion.goal].x;
     minion.posY = map[minion.goal].y;
