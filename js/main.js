@@ -84,8 +84,8 @@ let hp = 100;
 let FPS = 120;
 let theAnimation = setInterval(update, 1000/FPS);//Mitt Drawgrej
 let spawnMinions;
-let activeMinions = 0;
-let waveAmount = 8;
+let spawnedMinions = 0;
+let minionWaveAmount = 8;
 let wave = 0;
 let minionHp = 20;
 
@@ -101,7 +101,7 @@ let turret1 = {
     cost: 100,
     img: phpImage,
     projectileImg: pumpkinImage
-}
+};
 
 let turret2 = {
     attackType: "projectile",
@@ -111,7 +111,7 @@ let turret2 = {
     cost: 500,
     img: reactImage,
     projectileImg: candyImage
-}
+};
 
 let turret3 = {
     attackType: "shockwave",
@@ -121,7 +121,7 @@ let turret3 = {
     cost: 2500,
     img: jsImage,
     projectileImg: candyImage
-}
+};
 
 let turrets = [];
 let turretId = 1;
@@ -218,7 +218,7 @@ function draw(){
 
     // Draws projectiles
     projectiles.forEach(projectile => {
-    ctx.drawImage(projectile.img, projectile.posX-9, projectile.posY-9);
+        ctx.drawImage(projectile.img, projectile.posX-9, projectile.posY-9);
     });
 
     //Draws shockwaves
@@ -232,7 +232,7 @@ function draw(){
     ctx.fillText("Hp: " + hp, 920, 470);
     ctx.fillText("Cash: " + cash, 920, 520);
     ctx.fillText("Wave: " + wave, 10, 850);
-    ctx.fillText("BuyMenu: " , 200, 850)
+    ctx.fillText("BuyMenu: " , 200, 850);
 
     // BuyMenu
     if(cash >= 100){
@@ -278,10 +278,11 @@ function draw(){
     //If turret is bought, make it follow the cursor and show range
     if(turretBought){
         ctx.drawImage(turretBought.img, mouse_on_canvas.x - 20, mouse_on_canvas.y - 20);
-        ctx.beginPath();
-        ctx.arc(mouse_on_canvas.x, mouse_on_canvas.y, turretBought.range, 0, 2 * Math.PI);
-        ctx.stroke();
+        ctx.globalAlpha = 0.5;
+        circleFill(mouse_on_canvas.x, mouse_on_canvas.y, turretBought.range, "lightblue");
+        ctx.globalAlpha = 1;
     }
+
     //If hp dead, u dead
     if (hp <= 0){
         ctx.fillStyle = "red";
@@ -303,25 +304,31 @@ function update(){
     };
 
     //If no minions, create new minionwave
-    if(minions.length == 0){
+    if(minions.length === 0 && spawnedMinions == 0){
+    console.log("hej");       
+    minionWaveAmount++;
+
         wave++;
-        if(wave % 5 == 0){
-            minionHp += 3;
-        }
+        // if(wave % 5 == 0){
+        //     minionHp += 3;
+        // }
         spawnMinion();
         spawnMinions = setInterval(spawnMinion, 500);
     }
-    //If all minions in the active wave has spawned, stop spawning new ones 
-    if(activeMinions >= waveAmount){
+    //If all minions in the active wave has spawned, stop spawning new ones
+    if(spawnedMinions === minionWaveAmount){
+        console.log("hej");
         clearInterval(spawnMinions);
-        activeMinions = 0;
-        waveAmount++;
+    spawnedMinions = 0;
+
+        console.log("hej");
+        
 
     }
     //Spawns preset turrets
     if(turrets-length == 0){
         spawnTurret(700, 705, turret1);
-        spawnTurret(300, 305, turret2);
+        // spawnTurret(300, 305, turret2);
         spawnTurret(550, 100, turret1);
 
 
@@ -332,8 +339,8 @@ function update(){
         let minion = minionsMove(minions[i], i);
         minions[i] = minion;
         if(minion.goal == 12 && minion.from == 11){
-            index = minions.indexOf(minion)
-            splice(minion);
+            index = minions.indexOf(minion);
+            deleteMinion(minion);
             hp -= 10;
         }
     }
@@ -354,13 +361,14 @@ function update(){
             projectiles.splice(projectiles.indexOf(projectiles[i]), 1);
         }
     }
+
     for(let i = 0; i < shockwaves.length; i++){
         for(let j = 0; j < minions.length; j++){
             
             let inRange = getDistanceToMinion(shockwaves[i], minions[j], 9 + shockwaves[i].r);
             
             if (inRange && !shockwaves[i].minionsHit.includes(minions[j])){
-                minions[j].hp -= shockwaves[i].dmg
+                minions[j].hp -= shockwaves[i].dmg;
                 checkMiniondeath(minions[j]);
                 if(minions[j]){
                     shockwaves[i].minionsHit.push(minions[j]);
@@ -411,8 +419,10 @@ function spawnTurret(x, y, turretType){
  * Spawns a minion and pushes it into a array of minions
  */
 function spawnMinion(){ // Starts a minionwave
+    if(spawnedMinions <= minionWaveAmount){
+        spawnedMinions++;
         let minion = {
-            id: activeMinions += 1,
+            id: spawnedMinions,
             posX: map[startPos.mapIndex].x,
             posY: map[startPos.mapIndex].y,
             dir: startPos.dir,
@@ -422,6 +432,8 @@ function spawnMinion(){ // Starts a minionwave
             hp: minionHp
         }
     minions.push(minion);
+
+    }
 }
     
 /**
@@ -469,7 +481,8 @@ function changeDir(minion){
 
 }
 
-function splice(minion){
+//Delete a minion
+function deleteMinion(minion){
     let index = minions.indexOf(minion);
     if(index == 0){
         minions.splice(0, 1);
@@ -478,29 +491,24 @@ function splice(minion){
     }
 }
 
+
 function inTurretRange(minion){
     turrets.forEach(turret => {
         let inRange = getDistanceToMinion(turret, minion, turret.range);
         if(turret.attackType == "projectile"){
-            if(inRange){
-                if(!turret.shooting){   
-                    turret.shooting = true;
-                    fire = setInterval(shoot(turret, minion), turret.rof);
-                }
+            if(inRange && !turret.shooting){
+                turret.shooting = true;
+                fire = setInterval(shoot(turret, minion), turret.rof);
             }
         }else if (turret.attackType == "shockwave" && !turret.shooting){
             turret.shooting = true;
-            startShockwave(turret);
+            spawnShockwave(turret);
         }
 
     });
 }
 
-function startShockwave(turret){
-    spawnShockwave(turret);
-    circle(turret.posX, turret.posY, 1, "yellow");
-}
-
+//Spawns a shockwave
 function spawnShockwave(turret) {
     let shockwave = {
         turretIndex: turrets.indexOf(turret),
@@ -509,13 +517,14 @@ function spawnShockwave(turret) {
         dmg: 4,
         range: turret.range,
         r: 1,
-        color: "red",
+        color: "lightblue",
         minionsHit: []
     }
 
     shockwaves.push(shockwave);
 }
 
+//Fires a projectile
 function shoot(turret, minion){
     inRange = getDistanceToMinion(turret, minion, turret.range);
     if(inRange){
@@ -529,6 +538,7 @@ function stopFire(turret){
     turret.shooting = false;
 }
 
+//Spawns a projectile
 function spawnProjectile(turret, minion){
     let projectile = {
         posX: turret.posX,
@@ -543,6 +553,7 @@ function spawnProjectile(turret, minion){
     projectiles.push(projectile);
 }
 
+//Projectile moves towards target
 function projectilesMove(projectile, minion){
     projectile.goalX = minion.posX;
     projectile.goalY = minion.posY;
@@ -554,6 +565,7 @@ function projectilesMove(projectile, minion){
     projectile.posY += yVelocity;
 }
 
+//Get distance between a object (turret/projectile/shockwave) and minion
 function getDistanceToMinion(object, minion, range){
     let deltaX = object.posX - minion.posX;
     let deltaY = object.posY - minion.posY;
@@ -565,6 +577,7 @@ function getDistanceToMinion(object, minion, range){
     }
 }
 
+//Angle between the projectile and minion, to make the projectile move in the right direction
 function getAngle(projectile){
     dx = projectile.goalX - projectile.posX;
     dy = projectile.goalY - projectile.posY;
@@ -583,7 +596,7 @@ function findCurrentTarget(currentProjectile){
 
 function checkMiniondeath(minion){
     if(minion.hp <= 0){
-        killMinion(minion)
+        killMinion(minion);
     }
 }
 
@@ -593,16 +606,17 @@ function targetHit(projectile, minion){
     checkMiniondeath(minion);
 }
 function killMinion(minion){
-    splice(minion);
+    deleteMinion(minion);
     cash += (9 + wave);
 }
 
-
+//Updating mouse position
 document.addEventListener('mousemove', e => {
     mouse.x = e.clientX;
     mouse.y = e.clientY;
 });
 
+//Dropping turret
 document.addEventListener('mouseup', e => {      
     if(turretBought){
         spawnTurret(mouse_on_canvas.x + 20, mouse_on_canvas.y -20, turretBought);
@@ -610,6 +624,8 @@ document.addEventListener('mouseup', e => {
         turretBought = null;
     }
 });
+
+//Grabing turrets
 canvas.addEventListener('mousedown', function(event) {
     var x = mouse_on_canvas.x,
         y = mouse_on_canvas.y;
